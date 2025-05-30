@@ -179,7 +179,7 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
             onChange={(date) => handleDateChange(date, "postAt")}
             showTimeSelect
             timeFormat="HH:mm"
-            timeIntervals={15}
+            timeIntervals={1}
             minDate={new Date()}
             dateFormat="MMMM d, yyyy h:mm aa"
             placeholderText="Select date/time (optional)"
