@@ -48,16 +48,13 @@ const Auth = ({ children }) => {
     const handleAuthFlow = async () => {
       const params = new URLSearchParams(window.location.search);
 
-      // Handle successful OAuth callback
       if (params.has("auth_success")) {
         try {
-          // Give time for cookies to be set
           await new Promise((resolve) => setTimeout(resolve, 300));
 
           const isAuthed = await checkAuthStatus();
 
           if (isAuthed) {
-            // Clean URL without triggering full reload
             window.history.replaceState({}, "", window.location.pathname);
           } else {
             navigate("/?auth_error=1");
@@ -66,18 +63,14 @@ const Auth = ({ children }) => {
           console.error("Auth flow error:", error);
           navigate("/?auth_error=1");
         }
-      }
-      // Handle auth errors
-      else if (params.has("auth_error")) {
+      } else if (params.has("auth_error")) {
         setAuthState((prev) => ({
           ...prev,
           loading: false,
           error: "Authentication failed. Please try again.",
         }));
         window.history.replaceState({}, "", window.location.pathname);
-      }
-      // Regular page load
-      else {
+      } else {
         await checkAuthStatus();
       }
     };
@@ -86,9 +79,13 @@ const Auth = ({ children }) => {
   }, [navigate]);
 
   const handleLogin = () => {
-    // Clear any previous errors
+    document.cookie =
+      "slack_auth_state=; path=/; domain=.onrender.com; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     setAuthState((prev) => ({ ...prev, error: null }));
-    window.location.href = `${import.meta.env.VITE_API_URL}/auth/slack`;
+    const authUrl = `${
+      import.meta.env.VITE_API_URL
+    }/auth/slack?ts=${Date.now()}`;
+    window.location.href = authUrl;
   };
 
   const handleLogout = async () => {
@@ -126,7 +123,6 @@ const Auth = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-[#fdf6ec]">
-      {/* Auth Header Bar */}
       <div className="flex items-center justify-between p-4 bg-[#f3e2d2] border-b border-[#a67c52]">
         <div className="text-lg font-semibold text-[#5d3a1a]">
           Slack Message Manager
@@ -171,7 +167,6 @@ const Auth = ({ children }) => {
         )}
       </div>
 
-      {/* Main Content Area */}
       <div className="p-4">
         {authState.error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md border border-red-200">
