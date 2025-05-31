@@ -1,6 +1,7 @@
+// src/App.jsx
 import React from "react";
+import { Routes, Route } from "react-router-dom";
 import MessageHistory from "./components/MessageHistory";
-import { Route, Routes } from "react-router-dom";
 import AuthRedirect from "./components/AuthRedirect";
 import Auth from "./components/Auth";
 

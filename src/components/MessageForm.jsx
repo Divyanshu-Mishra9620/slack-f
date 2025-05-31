@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { Spinner } from "./Spinner";
 
 const MessageForm = ({ action, onSubmit, initialData = {} }) => {
   const [formData, setFormData] = useState({
@@ -11,11 +12,14 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
     oldest: null,
     latest: null,
   });
-  const [error, setError] = useState("");
 
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Sync initialData → form when editing/selecting a message
   useEffect(() => {
     setFormData((prev) => {
-      const newFormData = {
+      const newForm = {
         channel: initialData?.channel || "",
         text: initialData?.text || "",
         ts: initialData?.ts || "",
@@ -25,18 +29,15 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
         oldest: null,
         latest: null,
       };
-
-      const prevData = {
-        channel: prev?.channel,
-        text: prev?.text,
-        ts: prev?.ts,
-        postAt: prev?.postAt,
+      const prevCore = {
+        channel: prev.channel,
+        text: prev.text,
+        ts: prev.ts,
+        postAt: prev.postAt,
       };
-
-      if (JSON.stringify(prevData) !== JSON.stringify(newFormData)) {
-        return newFormData;
+      if (JSON.stringify(prevCore) !== JSON.stringify(newForm)) {
+        return newForm;
       }
-
       return prev;
     });
   }, [JSON.stringify(initialData)]);
@@ -51,6 +52,7 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
   };
 
   const validateForm = () => {
+    // For sending: if scheduled, time must be in future
     if (action === "send" && formData.postAt) {
       const now = new Date();
       if (formData.postAt <= now) {
@@ -59,6 +61,7 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
       }
     }
 
+    // For get/edit/delete: channel always required
     if (["get", "edit", "delete"].includes(action)) {
       if (!formData.channel) {
         setError("Channel is required");
@@ -71,6 +74,7 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
           return false;
         }
       } else {
+        // edit or delete: ts required
         if (!formData.ts) {
           setError("Message timestamp is required");
           return false;
@@ -87,10 +91,11 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
 
     if (!validateForm()) return;
 
+    setLoading(true);
     try {
       const payload = {
-        channel: formData.channel,
-        text: formData.text,
+        channel: formData.channel.trim(),
+        text: formData.text.trim(),
       };
 
       if (action === "send") {
@@ -98,38 +103,39 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
           ? Math.floor(formData.postAt.getTime() / 1000)
           : null;
       } else {
-        if (formData.ts) {
-          payload.ts = formData.ts;
-        }
-        if (formData.oldest) {
+        if (formData.ts) payload.ts = formData.ts.trim();
+        if (formData.oldest)
           payload.oldest = Math.floor(formData.oldest.getTime() / 1000);
-        }
-        if (formData.latest) {
+        if (formData.latest)
           payload.latest = Math.floor(formData.latest.getTime() / 1000);
-        }
       }
 
-      console.log("Submitting payload:", payload);
       await onSubmit(payload);
-    } catch (error) {
-      const errorMsg =
-        error?.response?.data?.error ||
-        error?.response?.data?.details ||
-        error?.message ||
+    } catch (err) {
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.details ||
+        err?.message ||
         "Failed to process request";
-      setError(errorMsg);
-      console.error("Submission error:", error);
+      setError(errMsg);
+      console.error("Submission error:", err);
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Common input classes
+  const inputClass =
+    "w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239] transition";
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="max-w-md mx-auto p-6 bg-[#f3e2d2] border-4 border-[#a67c52] rounded-xl shadow-lg space-y-4"
+      className="max-w-md mx-auto p-6 bg-white rounded-xl shadow-lg border border-[#a67c52] space-y-4"
     >
       <h2 className="text-center text-2xl font-semibold text-[#5d3a1a]">
         {action === "send"
-          ? "Send Message"
+          ? "Send / Schedule Message"
           : action === "edit"
           ? "Edit Message"
           : action === "delete"
@@ -138,42 +144,53 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
       </h2>
 
       {error && (
-        <div className="p-2 bg-red-100 text-red-800 rounded-md">{error}</div>
+        <div className="p-2 bg-red-100 text-red-800 rounded-md text-center">
+          {error}
+        </div>
       )}
 
+      {/* Channel Input */}
       <div>
-        <label className="block text-[#5d3a1a] mb-1">Channel ID</label>
+        <label className="block text-[#5d3a1a] mb-1 font-medium">
+          Channel ID
+        </label>
         <input
           type="text"
           name="channel"
           placeholder="e.g. C12345 or #general"
           value={formData.channel}
           onChange={handleChange}
-          required
-          className="w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239]"
+          className={inputClass}
         />
       </div>
 
-      {action !== "delete" && action !== "get" && (
+      {/* Message Text (send/edit/get) */}
+      {action !== "delete" && (
         <div>
-          <label className="block text-[#5d3a1a] mb-1">
-            {action === "get" ? "Message Filter" : "Message Text"}
+          <label className="block text-[#5d3a1a] mb-1 font-medium">
+            {action === "get"
+              ? "Message Filter (Text contains)"
+              : "Message Text"}
           </label>
           <textarea
             name="text"
-            placeholder="Your message here"
+            placeholder={
+              action === "get" ? "Filter substring" : "Your message here"
+            }
             value={formData.text}
             onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239]"
-            rows={4}
+            rows={action === "get" ? 2 : 4}
+            className={inputClass}
           />
         </div>
       )}
 
+      {/* Schedule DatePicker */}
       {action === "send" && (
         <div>
-          <label className="block text-[#5d3a1a] mb-1">Schedule Message</label>
+          <label className="block text-[#5d3a1a] mb-1 font-medium">
+            Schedule Message
+          </label>
           <DatePicker
             selected={formData.postAt}
             onChange={(date) => handleDateChange(date, "postAt")}
@@ -183,7 +200,7 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
             minDate={new Date()}
             dateFormat="MMMM d, yyyy h:mm aa"
             placeholderText="Select date/time (optional)"
-            className="w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239]"
+            className={`${inputClass}`}
             isClearable
           />
           <p className="text-sm text-[#8c6239] mt-1">
@@ -192,26 +209,31 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
         </div>
       )}
 
+      {/* Edit/Delete: Message Timestamp */}
       {["edit", "delete"].includes(action) && (
         <div>
-          <label className="block text-[#5d3a1a] mb-1">Message Timestamp</label>
+          <label className="block text-[#5d3a1a] mb-1 font-medium">
+            Message Timestamp
+          </label>
           <input
             type="text"
             name="ts"
             placeholder="e.g. 1625153956.000200"
             value={formData.ts}
             onChange={handleChange}
-            required
-            className="w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239]"
+            className={inputClass}
           />
         </div>
       )}
 
+      {/* Retrieve: Date range or specific timestamp */}
       {action === "get" && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[#5d3a1a] mb-1">Start Time</label>
+              <label className="block text-[#5d3a1a] mb-1 font-medium">
+                Start Time
+              </label>
               <DatePicker
                 selected={formData.oldest}
                 onChange={(date) => handleDateChange(date, "oldest")}
@@ -220,12 +242,14 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
                 timeIntervals={15}
                 dateFormat="MMMM d, yyyy h:mm aa"
                 placeholderText="Select start time"
-                className="w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239]"
+                className={inputClass}
                 isClearable
               />
             </div>
             <div>
-              <label className="block text-[#5d3a1a] mb-1">End Time</label>
+              <label className="block text-[#5d3a1a] mb-1 font-medium">
+                End Time
+              </label>
               <DatePicker
                 selected={formData.latest}
                 onChange={(date) => handleDateChange(date, "latest")}
@@ -234,14 +258,13 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
                 timeIntervals={15}
                 dateFormat="MMMM d, yyyy h:mm aa"
                 placeholderText="Select end time"
-                className="w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239]"
+                className={inputClass}
                 isClearable
               />
             </div>
           </div>
-
           <div className="mt-2">
-            <label className="block text-[#5d3a1a] mb-1">
+            <label className="block text-[#5d3a1a] mb-1 font-medium">
               OR Specific Timestamp
             </label>
             <input
@@ -250,7 +273,7 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
               placeholder="e.g. 1625153956.000200"
               value={formData.ts}
               onChange={handleChange}
-              className="w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239]"
+              className={inputClass}
             />
           </div>
         </>
@@ -258,14 +281,30 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
 
       <button
         type="submit"
-        className="w-full py-2 bg-[#d8a76c] text-white font-semibold rounded-lg shadow-md hover:bg-[#c48c57] active:translate-y-[2px] active:shadow-sm transition-all duration-150"
+        disabled={loading}
+        className={`w-full flex items-center justify-center py-2 ${
+          loading
+            ? "bg-[#c48c57] cursor-not-allowed"
+            : "bg-[#d8a76c] hover:bg-[#c48c57]"
+        } text-white font-semibold rounded-lg shadow-md transition-all duration-150`}
       >
+        {loading ? (
+          <Spinner className="w-5 h-5 text-white animate-spin mr-2" />
+        ) : null}
         {action === "send"
-          ? "Send Message"
+          ? loading
+            ? "Sending..."
+            : "Send Message"
           : action === "edit"
-          ? "Update Message"
+          ? loading
+            ? "Updating..."
+            : "Update Message"
           : action === "delete"
-          ? "Delete Message"
+          ? loading
+            ? "Deleting..."
+            : "Delete Message"
+          : loading
+          ? "Retrieving..."
           : "Retrieve Messages"}
       </button>
     </form>

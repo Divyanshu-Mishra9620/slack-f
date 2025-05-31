@@ -12,15 +12,31 @@ const Auth = ({ children }) => {
   });
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const verifyInterval = setInterval(() => {
+      if (authState.isAuthenticated) {
+        checkAuthStatus();
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(verifyInterval);
+  }, [authState.isAuthenticated]);
+
   const checkAuthStatus = async () => {
     try {
       const response = await axios.get(
         `${import.meta.env.VITE_API_URL}/auth/status`,
-        { withCredentials: true }
+        {
+          withCredentials: true,
+          timeout: 5000, // Add timeout
+        }
       );
+
+      // Add explicit verification
       if (!response.data || typeof response.data.authenticated !== "boolean") {
         throw new Error("Invalid auth response");
       }
+
       if (response.data.authenticated) {
         setAuthState({
           isAuthenticated: true,
@@ -33,12 +49,12 @@ const Auth = ({ children }) => {
       }
       return false;
     } catch (error) {
-      console.error("Auth check error:", error);
+      console.error("Auth verification failed:", error);
       setAuthState((prev) => ({
         ...prev,
-        loading: false,
         isAuthenticated: false,
-        error: "Authentication check failed",
+        loading: false,
+        error: "Session verification failed",
         authChecked: true,
       }));
       return false;
@@ -46,47 +62,49 @@ const Auth = ({ children }) => {
   };
 
   useEffect(() => {
-    const verifyInterval = setInterval(() => {
-      if (authState.isAuthenticated) {
-        checkAuthStatus();
-      }
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(verifyInterval);
-  }, [authState.isAuthenticated]);
-
-  useEffect(() => {
     const handleAuthFlow = async () => {
       const params = new URLSearchParams(window.location.search);
+      const isAuthSuccess = params.has("auth_success");
+      const isAuthError = params.has("auth_error");
 
-      if (params.has("auth_success")) {
-        try {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          window.history.replaceState({}, "", window.location.pathname);
+      try {
+        if (isAuthSuccess) {
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
 
           const isAuthed = await checkAuthStatus();
           if (!isAuthed) {
             navigate("/?auth_error=1&reason=auth_verification_failed");
+            return;
           }
-        } catch (error) {
+        } else if (isAuthError) {
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
           setAuthState((prev) => ({
             ...prev,
             loading: false,
-            error: "Authentication failed",
+            error: `Authentication failed: ${
+              params.get("reason") || "Unknown error"
+            }`,
             authChecked: true,
           }));
+        } else {
+          await checkAuthStatus();
         }
-      } else if (params.has("auth_error")) {
+      } catch (error) {
+        console.error("Auth flow error:", error);
         setAuthState((prev) => ({
           ...prev,
           loading: false,
-          error: "Authentication failed. Please try again.",
+          error: "Authentication process failed",
           authChecked: true,
         }));
-        window.history.replaceState({}, "", window.location.pathname);
-      } else {
-        await checkAuthStatus();
       }
     };
 
