@@ -18,7 +18,9 @@ const Auth = ({ children }) => {
         `${import.meta.env.VITE_API_URL}/auth/status`,
         { withCredentials: true }
       );
-
+      if (!response.data || typeof response.data.authenticated !== "boolean") {
+        throw new Error("Invalid auth response");
+      }
       if (response.data.authenticated) {
         setAuthState({
           isAuthenticated: true,
@@ -35,12 +37,23 @@ const Auth = ({ children }) => {
       setAuthState((prev) => ({
         ...prev,
         loading: false,
+        isAuthenticated: false,
         error: "Authentication check failed",
         authChecked: true,
       }));
       return false;
     }
   };
+
+  useEffect(() => {
+    const verifyInterval = setInterval(() => {
+      if (authState.isAuthenticated) {
+        checkAuthStatus();
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(verifyInterval);
+  }, [authState.isAuthenticated]);
 
   useEffect(() => {
     const handleAuthFlow = async () => {
