@@ -21,6 +21,9 @@ const Auth = ({ children }) => {
         `${import.meta.env.VITE_API_URL}/auth/status`,
         {
           withCredentials: true,
+          headers: {
+            "Cache-Control": "no-cache",
+          },
         }
       );
 
@@ -34,7 +37,6 @@ const Auth = ({ children }) => {
         }));
         return true;
       } else {
-        // Retry after delay if first attempt fails
         await new Promise((resolve) => setTimeout(resolve, 500));
         const retryResponse = await axios.get(
           `${import.meta.env.VITE_API_URL}/auth/status`,
@@ -70,10 +72,10 @@ const Auth = ({ children }) => {
 
       if (params.has("auth_success")) {
         try {
-          // Clear the success param from URL
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, "", cleanUrl);
           window.history.replaceState({}, "", window.location.pathname);
 
-          // Check auth status with retry logic
           const isAuthed = await checkAuthStatus();
 
           if (!isAuthed) {
@@ -92,7 +94,6 @@ const Auth = ({ children }) => {
         }));
         window.history.replaceState({}, "", window.location.pathname);
       } else {
-        // Initial auth check on component mount
         await checkAuthStatus();
       }
     };
@@ -101,15 +102,11 @@ const Auth = ({ children }) => {
   }, [navigate]);
 
   const handleLogin = () => {
-    // Clear any existing state and errors
-    document.cookie =
-      "slack_auth_state=; path=/; domain=.onrender.com; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     setAuthState((prev) => ({ ...prev, error: null }));
 
-    // Force fresh auth request
     const authUrl = `${
       import.meta.env.VITE_API_URL
-    }/auth/slack?ts=${Date.now()}`;
+    }/auth/slack/callback?ts=${Date.now()}`;
     window.location.href = authUrl;
   };
 
