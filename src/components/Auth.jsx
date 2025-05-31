@@ -23,7 +23,11 @@ const Auth = ({ children }) => {
         {
           withCredentials: true,
           headers: {
-            "Cache-Control": "no-cache",
+            ...(import.meta.env.NODE_ENV === "development"
+              ? {
+                  "Cache-Control": "no-cache",
+                }
+              : {}),
           },
         }
       );
