@@ -14,21 +14,12 @@ const Auth = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const hasAuthSignal = document.cookie.includes("slack_auth_signal=true");
-      const hasAuthCookie = document.cookie.includes("slack_auth_visible");
-      console.log("Has auth cookie:", hasAuthCookie);
-
+      console.log("Checking auth status...");
       const response = await axios.get(
         `${import.meta.env.VITE_API_URL}/auth/status`,
         {
           withCredentials: true,
-          headers: {
-            ...(import.meta.env.NODE_ENV === "development"
-              ? {
-                  "Cache-Control": "no-cache",
-                }
-              : {}),
-          },
+          timeout: 10000,
         }
       );
 
@@ -43,17 +34,14 @@ const Auth = ({ children }) => {
           authChecked: true,
         });
         return true;
-      } else if (hasAuthSignal) {
-        console.warn("Auth signal exists but token not received by backend");
-        window.location.reload(true);
-        return false;
       }
+
       return false;
     } catch (error) {
-      console.error(
-        "Auth check failed:",
-        error.response?.data || error.message
-      );
+      console.error("Auth check error:", {
+        message: error.message,
+        response: error.response?.data,
+      });
       return false;
     }
   };
@@ -64,12 +52,13 @@ const Auth = ({ children }) => {
 
       if (params.has("auth_success")) {
         try {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
           window.history.replaceState({}, "", window.location.pathname);
 
           const isAuthed = await checkAuthStatus();
-
           if (!isAuthed) {
-            navigate("/?auth_error=1");
+            navigate("/?auth_error=1&reason=auth_verification_failed");
           }
         } catch (error) {
           navigate(
