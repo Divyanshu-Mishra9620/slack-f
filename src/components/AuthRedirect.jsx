@@ -7,13 +7,22 @@ const AuthRedirect = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    const errorReason = params.get("reason");
 
     if (params.get("auth_success") === "1") {
-      navigate("/", { state: { authSuccess: true } });
+      navigate("/", {
+        state: {
+          authSuccess: true,
+          timestamp: Date.now(),
+        },
+      });
     } else if (params.get("auth_error") === "1") {
-      navigate("/", { state: { authError: true } });
-    } else if (params.get("logout_success") === "1") {
-      navigate("/", { state: { logoutSuccess: true } });
+      navigate("/", {
+        state: {
+          authError: true,
+          reason: errorReason || "unknown_error",
+        },
+      });
     }
   }, [location, navigate]);
 

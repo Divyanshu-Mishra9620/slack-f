@@ -14,6 +14,7 @@ const Auth = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
+      const hasAuthSignal = document.cookie.includes("slack_auth_signal=true");
       const hasAuthCookie = document.cookie.includes("slack_auth_visible");
       console.log("Has auth cookie:", hasAuthCookie);
 
@@ -27,41 +28,28 @@ const Auth = ({ children }) => {
         }
       );
 
+      console.log("Auth status response:", response.data);
+
       if (response.data.authenticated) {
-        setAuthState((prev) => ({
-          ...prev,
+        setAuthState({
           isAuthenticated: true,
           userInfo: response.data.user,
           loading: false,
+          error: null,
           authChecked: true,
-        }));
+        });
         return true;
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        const retryResponse = await axios.get(
-          `${import.meta.env.VITE_API_URL}/auth/status`,
-          { withCredentials: true }
-        );
-
-        const isAuthed = retryResponse.data.authenticated;
-        setAuthState((prev) => ({
-          ...prev,
-          isAuthenticated: isAuthed,
-          userInfo: retryResponse.data.user,
-          loading: false,
-          authChecked: true,
-        }));
-        return isAuthed;
+      } else if (hasAuthSignal) {
+        console.warn("Auth signal exists but token not received by backend");
+        window.location.reload(true);
+        return false;
       }
+      return false;
     } catch (error) {
-      console.error("Auth check failed:", error);
-      setAuthState((prev) => ({
-        ...prev,
-        isAuthenticated: false,
-        loading: false,
-        error: "Failed to check authentication status",
-        authChecked: true,
-      }));
+      console.error(
+        "Auth check failed:",
+        error.response?.data || error.message
+      );
       return false;
     }
   };
@@ -80,8 +68,9 @@ const Auth = ({ children }) => {
             navigate("/?auth_error=1");
           }
         } catch (error) {
-          console.error("Auth flow error:", error);
-          navigate("/?auth_error=1");
+          navigate(
+            `/?auth_error=1&reason=${encodeURIComponent(error.message)}`
+          );
         }
       } else if (params.has("auth_error")) {
         setAuthState((prev) => ({
@@ -101,11 +90,9 @@ const Auth = ({ children }) => {
 
   const handleLogin = () => {
     setAuthState((prev) => ({ ...prev, error: null }));
-
-    const authUrl = `${
+    window.location.href = `${
       import.meta.env.VITE_API_URL
-    }/auth/slack?ts=${Date.now()}`;
-    window.location.href = authUrl;
+    }/auth/slack?ts=${Date.now()}&force=true`;
   };
 
   const handleLogout = async () => {
@@ -135,7 +122,16 @@ const Auth = ({ children }) => {
       <div className="min-h-screen bg-[#fdf6ec] flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#a67c52] mx-auto mb-4"></div>
-          <p className="text-[#5d3a1a]">Verifying authentication...</p>
+          <p className="text-[#5d3a1a]">
+            {location.state?.authSuccess
+              ? "Finalizing login..."
+              : "Verifying authentication..."}
+          </p>
+          {location.state?.reason && (
+            <p className="text-sm text-[#8c6239] mt-2">
+              Status: {location.state.reason}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -191,6 +187,11 @@ const Auth = ({ children }) => {
         {authState.error && (
           <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md border border-red-200">
             {authState.error}
+            {location.state?.reason && (
+              <div className="text-xs mt-1">
+                Reason: {location.state.reason}
+              </div>
+            )}
           </div>
         )}
 
