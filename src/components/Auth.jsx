@@ -1,69 +1,155 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
-const VITE_API_URL = import.meta.env.VITE_API_URL;
+import { useNavigate } from "react-router-dom";
 
 const Auth = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userInfo, setUserInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState({
+    isAuthenticated: false,
+    userInfo: null,
+    loading: true,
+    error: null,
+    authChecked: false,
+  });
+  const navigate = useNavigate();
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/auth/status`,
+        {
+          withCredentials: true,
+        }
+      );
+      console.log(response.data);
+
+      setAuthState({
+        isAuthenticated: response.data.authenticated,
+        userInfo: response.data.user || null,
+        loading: false,
+        error: null,
+        authChecked: true,
+      });
+
+      return response.data.authenticated;
+    } catch (error) {
+      console.error("Auth check error:", error);
+      setAuthState({
+        isAuthenticated: false,
+        userInfo: null,
+        loading: false,
+        error: "Failed to verify authentication",
+        authChecked: true,
+      });
+      return false;
+    }
+  };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await axios.get(`${VITE_API_URL}/auth/status`, {
-          withCredentials: true,
-        });
-        setIsAuthenticated(response.data.authenticated);
-        setUserInfo(response.data.user);
-      } catch (error) {
-        console.error("Auth check failed:", error);
-      } finally {
-        setLoading(false);
+    const handleAuthFlow = async () => {
+      const params = new URLSearchParams(window.location.search);
+
+      // Handle successful OAuth callback
+      if (params.has("auth_success")) {
+        try {
+          // Give time for cookies to be set
+          await new Promise((resolve) => setTimeout(resolve, 300));
+
+          const isAuthed = await checkAuthStatus();
+
+          if (isAuthed) {
+            // Clean URL without triggering full reload
+            window.history.replaceState({}, "", window.location.pathname);
+          } else {
+            navigate("/?auth_error=1");
+          }
+        } catch (error) {
+          console.error("Auth flow error:", error);
+          navigate("/?auth_error=1");
+        }
+      }
+      // Handle auth errors
+      else if (params.has("auth_error")) {
+        setAuthState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "Authentication failed. Please try again.",
+        }));
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+      // Regular page load
+      else {
+        await checkAuthStatus();
       }
     };
 
-    checkAuth();
-  }, []);
+    handleAuthFlow();
+  }, [navigate]);
 
   const handleLogin = () => {
-    window.location.href = `${VITE_API_URL}/auth/slack`;
+    // Clear any previous errors
+    setAuthState((prev) => ({ ...prev, error: null }));
+    window.location.href = `${import.meta.env.VITE_API_URL}/auth/slack`;
   };
 
   const handleLogout = async () => {
     try {
-      await axios.get(`${VITE_API_URL}/auth/logout`, {
+      await axios.get(`${import.meta.env.VITE_API_URL}/auth/logout`, {
         withCredentials: true,
       });
-      setIsAuthenticated(false);
-      setUserInfo(null);
+      setAuthState({
+        isAuthenticated: false,
+        userInfo: null,
+        loading: false,
+        error: null,
+        authChecked: true,
+      });
+      navigate("/?logout_success=1");
     } catch (error) {
       console.error("Logout failed:", error);
+      setAuthState((prev) => ({
+        ...prev,
+        error: "Failed to logout. Please try again.",
+      }));
     }
   };
 
-  if (loading) {
-    return <div className="p-4 text-center">Checking authentication...</div>;
+  if (authState.loading) {
+    return (
+      <div className="min-h-screen bg-[#fdf6ec] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#a67c52] mx-auto mb-4"></div>
+          <p className="text-[#5d3a1a]">Verifying authentication...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-[#fdf6ec]">
-      <div className="flex items-center justify-end p-4 bg-[#fdf6ec]">
-        {isAuthenticated ? (
+      {/* Auth Header Bar */}
+      <div className="flex items-center justify-between p-4 bg-[#f3e2d2] border-b border-[#a67c52]">
+        <div className="text-lg font-semibold text-[#5d3a1a]">
+          Slack Message Manager
+        </div>
+
+        {authState.isAuthenticated ? (
           <div className="flex items-center space-x-4">
-            {userInfo?.image && (
+            {authState.userInfo?.image && (
               <img
-                src={userInfo.image}
+                src={authState.userInfo.image}
                 alt="User"
-                className="w-10 h-10 rounded-full border-2 border-[#a67c52]"
+                className="w-8 h-8 rounded-full border border-[#a67c52]"
+                onError={(e) => {
+                  e.target.src = "https://via.placeholder.com/32";
+                }}
               />
             )}
-            <span className="text-[#5d3a1a] font-medium">
-              {userInfo?.name || "Slack User"}
+            <span className="text-sm text-[#5d3a1a]">
+              {authState.userInfo?.name || "Slack User"}
             </span>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-[#d8a76c] text-white rounded-lg hover:bg-[#c48c57] transition"
+              className="px-3 py-1 bg-[#d8a76c] text-white rounded-md hover:bg-[#c48c57] transition text-sm"
             >
               Logout
             </button>
@@ -71,12 +157,12 @@ const Auth = ({ children }) => {
         ) : (
           <button
             onClick={handleLogin}
-            className="flex items-center space-x-2 px-4 py-2 bg-[#4A154B] text-white rounded-lg hover:bg-[#3c0e3d] transition"
+            className="flex items-center space-x-2 px-3 py-1 bg-[#4A154B] text-white rounded-md hover:bg-[#3c0e3d] transition text-sm"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
-              className="w-5 h-5 fill-current"
+              className="w-4 h-4 fill-current"
             >
               <path d="M6 15a2 2 0 1 1-2-2c0 1.103.897 2 2 2zm0-2zm.459-3h3.082c.402 0 .77-.238.928-.616L11.728 6h2.544l1.259 3.384c.158.378.526.616.928.616h3.082l-1.29 3.324c-.147.379-.515.616-.928.616H16.46l-.728 2H9.268l-.728-2H6.677c-.413 0-.781-.237-.928-.616L4.459 10zm5.551-2l-.8-2H8.79l-.8 2h3.02z" />
             </svg>
@@ -85,18 +171,42 @@ const Auth = ({ children }) => {
         )}
       </div>
 
-      {isAuthenticated ? (
-        children
-      ) : (
-        <div className="max-w-2xl mx-auto p-8 text-center">
-          <h2 className="text-2xl font-bold text-[#5d3a1a] mb-4">
-            Slack Message Manager
-          </h2>
-          <p className="text-[#8c6239] mb-6">
-            Please login with Slack to manage your messages
-          </p>
-        </div>
-      )}
+      {/* Main Content Area */}
+      <div className="p-4">
+        {authState.error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md border border-red-200">
+            {authState.error}
+          </div>
+        )}
+
+        {authState.isAuthenticated ? (
+          children
+        ) : (
+          <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-md border border-[#a67c52]">
+            <h2 className="text-xl font-bold text-[#5d3a1a] mb-4 text-center">
+              Welcome to Slack Message Manager
+            </h2>
+            <p className="text-[#8c6239] mb-6 text-center">
+              Please authenticate with Slack to manage your messages
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={handleLogin}
+                className="flex items-center space-x-2 px-4 py-2 bg-[#4A154B] text-white rounded-lg hover:bg-[#3c0e3d] transition"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 fill-current"
+                >
+                  <path d="M6 15a2 2 0 1 1-2-2c0 1.103.897 2 2 2zm0-2zm.459-3h3.082c.402 0 .77-.238.928-.616L11.728 6h2.544l1.259 3.384c.158.378.526.616.928.616h3.082l-1.29 3.324c-.147.379-.515.616-.928.616H16.46l-.728 2H9.268l-.728-2H6.677c-.413 0-.781-.237-.928-.616L4.459 10zm5.551-2l-.8-2H8.79l-.8 2h3.02z" />
+                </svg>
+                <span>Continue with Slack</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
