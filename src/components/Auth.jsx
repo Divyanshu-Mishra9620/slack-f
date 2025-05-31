@@ -72,8 +72,6 @@ const Auth = ({ children }) => {
 
       if (params.has("auth_success")) {
         try {
-          const cleanUrl = window.location.origin + window.location.pathname;
-          window.history.replaceState({}, "", cleanUrl);
           window.history.replaceState({}, "", window.location.pathname);
 
           const isAuthed = await checkAuthStatus();
@@ -106,7 +104,7 @@ const Auth = ({ children }) => {
 
     const authUrl = `${
       import.meta.env.VITE_API_URL
-    }/auth/slack/callback?ts=${Date.now()}`;
+    }/auth/slack?ts=${Date.now()}`;
     window.location.href = authUrl;
   };
 
