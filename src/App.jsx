@@ -1,5 +1,7 @@
 import React from "react";
 import MessageHistory from "./components/MessageHistory";
+import { Route, Routes } from "react-router-dom";
+import AuthRedirect from "./components/AuthRedirect";
 
 function App() {
   return (
@@ -10,7 +12,10 @@ function App() {
       </header>
 
       <main className="px-4 py-10">
-        <MessageHistory />
+        <Routes>
+          <Route path="/" element={<MessageHistory />} />
+          <Route path="/auth-redirect" element={<AuthRedirect />} />
+        </Routes>
       </main>
     </div>
   );
