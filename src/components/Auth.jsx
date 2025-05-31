@@ -14,16 +14,10 @@ const Auth = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      console.log("Checking auth status...");
       const response = await axios.get(
         `${import.meta.env.VITE_API_URL}/auth/status`,
-        {
-          withCredentials: true,
-          timeout: 10000,
-        }
+        { withCredentials: true }
       );
-
-      console.log("Auth status response:", response.data);
 
       if (response.data.authenticated) {
         setAuthState({
@@ -35,13 +29,15 @@ const Auth = ({ children }) => {
         });
         return true;
       }
-
       return false;
     } catch (error) {
-      console.error("Auth check error:", {
-        message: error.message,
-        response: error.response?.data,
-      });
+      console.error("Auth check error:", error);
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "Authentication check failed",
+        authChecked: true,
+      }));
       return false;
     }
   };
@@ -61,9 +57,12 @@ const Auth = ({ children }) => {
             navigate("/?auth_error=1&reason=auth_verification_failed");
           }
         } catch (error) {
-          navigate(
-            `/?auth_error=1&reason=${encodeURIComponent(error.message)}`
-          );
+          setAuthState((prev) => ({
+            ...prev,
+            loading: false,
+            error: "Authentication failed",
+            authChecked: true,
+          }));
         }
       } else if (params.has("auth_error")) {
         setAuthState((prev) => ({
