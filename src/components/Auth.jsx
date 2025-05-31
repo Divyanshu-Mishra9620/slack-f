@@ -14,32 +14,52 @@ const Auth = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
+      const hasAuthCookie = document.cookie.includes("slack_auth_visible");
+      console.log("Has auth cookie:", hasAuthCookie);
+
       const response = await axios.get(
         `${import.meta.env.VITE_API_URL}/auth/status`,
         {
           withCredentials: true,
         }
       );
-      console.log(response.data);
 
-      setAuthState({
-        isAuthenticated: response.data.authenticated,
-        userInfo: response.data.user || null,
-        loading: false,
-        error: null,
-        authChecked: true,
-      });
+      if (response.data.authenticated) {
+        setAuthState((prev) => ({
+          ...prev,
+          isAuthenticated: true,
+          userInfo: response.data.user,
+          loading: false,
+          authChecked: true,
+        }));
+        return true;
+      } else {
+        // Retry after delay if first attempt fails
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const retryResponse = await axios.get(
+          `${import.meta.env.VITE_API_URL}/auth/status`,
+          { withCredentials: true }
+        );
 
-      return response.data.authenticated;
+        const isAuthed = retryResponse.data.authenticated;
+        setAuthState((prev) => ({
+          ...prev,
+          isAuthenticated: isAuthed,
+          userInfo: retryResponse.data.user,
+          loading: false,
+          authChecked: true,
+        }));
+        return isAuthed;
+      }
     } catch (error) {
-      console.error("Auth check error:", error);
-      setAuthState({
+      console.error("Auth check failed:", error);
+      setAuthState((prev) => ({
+        ...prev,
         isAuthenticated: false,
-        userInfo: null,
         loading: false,
-        error: "Failed to verify authentication",
+        error: "Failed to check authentication status",
         authChecked: true,
-      });
+      }));
       return false;
     }
   };
@@ -50,13 +70,13 @@ const Auth = ({ children }) => {
 
       if (params.has("auth_success")) {
         try {
-          await new Promise((resolve) => setTimeout(resolve, 300));
+          // Clear the success param from URL
+          window.history.replaceState({}, "", window.location.pathname);
 
+          // Check auth status with retry logic
           const isAuthed = await checkAuthStatus();
 
-          if (isAuthed) {
-            window.history.replaceState({}, "", window.location.pathname);
-          } else {
+          if (!isAuthed) {
             navigate("/?auth_error=1");
           }
         } catch (error) {
@@ -68,9 +88,11 @@ const Auth = ({ children }) => {
           ...prev,
           loading: false,
           error: "Authentication failed. Please try again.",
+          authChecked: true,
         }));
         window.history.replaceState({}, "", window.location.pathname);
       } else {
+        // Initial auth check on component mount
         await checkAuthStatus();
       }
     };
@@ -79,9 +101,12 @@ const Auth = ({ children }) => {
   }, [navigate]);
 
   const handleLogin = () => {
+    // Clear any existing state and errors
     document.cookie =
       "slack_auth_state=; path=/; domain=.onrender.com; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     setAuthState((prev) => ({ ...prev, error: null }));
+
+    // Force fresh auth request
     const authUrl = `${
       import.meta.env.VITE_API_URL
     }/auth/slack?ts=${Date.now()}`;
