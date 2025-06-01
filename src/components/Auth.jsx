@@ -3,6 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 axios.defaults.baseURL = import.meta.env.VITE_API_URL;
+const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 const Auth = ({ children }) => {
   const [authState, setAuthState] = useState({
@@ -131,7 +132,7 @@ const Auth = ({ children }) => {
 
   const handleLogin = () => {
     setAuthState((prev) => ({ ...prev, error: null }));
-    window.location.href = `${import.meta.env.VITE_API_URL}/auth/slack`;
+    window.location.href = `${VITE_API_URL}/auth/slack`;
   };
 
   const handleLogout = async () => {
