@@ -227,16 +227,19 @@ const Auth = ({ children }) => {
       </div>
 
       <div className="p-4">
-        {authState.error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md border border-red-200">
-            {authState.error}
-            {location.state?.reason && (
-              <div className="text-xs mt-1">
-                Reason: {location.state.reason}
-              </div>
-            )}
-          </div>
-        )}
+        {authState.error &&
+          !authState.loading &&
+          authState.authChecked &&
+          location.search.includes("auth_error") && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md border border-red-200">
+              {authState.error}
+              {location.state?.reason && (
+                <div className="text-xs mt-1">
+                  Reason: {location.state.reason}
+                </div>
+              )}
+            </div>
+          )}
 
         {authState.isAuthenticated ? (
           children
