@@ -2,6 +2,21 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+axios.defaults.withCredentials = true;
+axios.defaults.baseURL = import.meta.env.VITE_API_URL;
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.code === "ERR_NETWORK") {
+      return Promise.reject({
+        message: "Network error - please check your connection",
+        original: error,
+      });
+    }
+    return Promise.reject(error);
+  }
+);
+
 const Auth = ({ children }) => {
   const [authState, setAuthState] = useState({
     isAuthenticated: false,
@@ -24,20 +39,14 @@ const Auth = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/auth/status`,
-        {
-          withCredentials: true,
-          timeout: 5000, // Add timeout
-        }
-      );
+      const response = await axios.get("/auth/status", {
+        timeout: 5000,
+        validateStatus: (status) => status < 500, // Don't reject for 4xx errors
+      });
 
-      // Add explicit verification
-      if (!response.data || typeof response.data.authenticated !== "boolean") {
-        throw new Error("Invalid auth response");
-      }
+      console.log("Auth response:", response.data);
 
-      if (response.data.authenticated) {
+      if (response.data?.authenticated) {
         setAuthState({
           isAuthenticated: true,
           userInfo: response.data.user,
@@ -47,9 +56,21 @@ const Auth = ({ children }) => {
         });
         return true;
       }
+
+      setAuthState((prev) => ({
+        ...prev,
+        isAuthenticated: false,
+        loading: false,
+        authChecked: true,
+      }));
       return false;
     } catch (error) {
-      console.error("Auth verification failed:", error);
+      console.error("Auth check failed:", {
+        message: error.message,
+        config: error.config,
+        response: error.response?.data,
+      });
+
       setAuthState((prev) => ({
         ...prev,
         isAuthenticated: false,

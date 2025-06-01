@@ -16,7 +16,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Sync initialData → form when editing/selecting a message
   useEffect(() => {
     setFormData((prev) => {
       const newForm = {
@@ -52,7 +51,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
   };
 
   const validateForm = () => {
-    // For sending: if scheduled, time must be in future
     if (action === "send" && formData.postAt) {
       const now = new Date();
       if (formData.postAt <= now) {
@@ -61,7 +59,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
       }
     }
 
-    // For get/edit/delete: channel always required
     if (["get", "edit", "delete"].includes(action)) {
       if (!formData.channel) {
         setError("Channel is required");
@@ -74,7 +71,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
           return false;
         }
       } else {
-        // edit or delete: ts required
         if (!formData.ts) {
           setError("Message timestamp is required");
           return false;
@@ -124,7 +120,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
     }
   };
 
-  // Common input classes
   const inputClass =
     "w-full px-4 py-2 border-2 border-[#a67c52] rounded-lg bg-[#fbe7c6] text-[#5d3a1a] focus:outline-none focus:ring-2 focus:ring-[#8c6239] transition";
 
@@ -149,7 +144,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
         </div>
       )}
 
-      {/* Channel Input */}
       <div>
         <label className="block text-[#5d3a1a] mb-1 font-medium">
           Channel ID
@@ -164,7 +158,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
         />
       </div>
 
-      {/* Message Text (send/edit/get) */}
       {action !== "delete" && (
         <div>
           <label className="block text-[#5d3a1a] mb-1 font-medium">
@@ -185,7 +178,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
         </div>
       )}
 
-      {/* Schedule DatePicker */}
       {action === "send" && (
         <div>
           <label className="block text-[#5d3a1a] mb-1 font-medium">
@@ -209,7 +201,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
         </div>
       )}
 
-      {/* Edit/Delete: Message Timestamp */}
       {["edit", "delete"].includes(action) && (
         <div>
           <label className="block text-[#5d3a1a] mb-1 font-medium">
@@ -226,7 +217,6 @@ const MessageForm = ({ action, onSubmit, initialData = {} }) => {
         </div>
       )}
 
-      {/* Retrieve: Date range or specific timestamp */}
       {action === "get" && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

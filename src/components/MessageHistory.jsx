@@ -63,7 +63,6 @@ const MessageHistory = () => {
             </div>
           )}
 
-          {/* Send / Schedule Section */}
           <section className="bg-[#f3e2d2] border-2 border-[#a67c52] rounded-xl shadow-lg p-6 space-y-4">
             <h3 className="text-xl font-semibold text-[#5d3a1a] mb-2">
               Send / Schedule Message
@@ -96,21 +95,18 @@ const MessageHistory = () => {
             />
           </section>
 
-          {/* Retrieve Section */}
           <section className="bg-[#f3e2d2] border-2 border-[#a67c52] rounded-xl shadow-lg p-6 space-y-4">
             <h3 className="text-xl font-semibold text-[#5d3a1a] mb-2">
               Retrieve Messages
             </h3>
             <MessageForm action="get" onSubmit={handleGetMessages} />
 
-            {/* Show loading spinner while retrieving */}
             {loadingGet && (
               <div className="flex justify-center mt-4">
                 <Spinner className="w-8 h-8 text-[#a67c52]" />
               </div>
             )}
 
-            {/* Display messages once loaded */}
             {messages.length > 0 && (
               <div className="mt-6 space-y-3">
                 <h4 className="text-lg font-medium text-[#5d3a1a]">
@@ -141,7 +137,6 @@ const MessageHistory = () => {
             )}
           </section>
 
-          {/* Edit Section */}
           <section className="bg-[#f3e2d2] border-2 border-[#a67c52] rounded-xl shadow-lg p-6 space-y-4">
             <h3 className="text-xl font-semibold text-[#5d3a1a] mb-2">
               Edit Message
@@ -158,7 +153,6 @@ const MessageHistory = () => {
                     text: data.text,
                   });
                   showSuccess("Message updated successfully!");
-                  // Clear selection and results
                   setMessages([]);
                   setSelectedMessage(null);
                 } catch (err) {
@@ -170,7 +164,6 @@ const MessageHistory = () => {
             />
           </section>
 
-          {/* Delete Section */}
           <section className="bg-[#f3e2d2] border-2 border-[#a67c52] rounded-xl shadow-lg p-6 space-y-4">
             <h3 className="text-xl font-semibold text-[#5d3a1a] mb-2">
               Delete Message
@@ -185,7 +178,6 @@ const MessageHistory = () => {
                     data: { channel: data.channel, ts: data.ts },
                   });
                   showSuccess("Message deleted successfully!");
-                  // Filter out deleted message from local state
                   setMessages((msgs) =>
                     msgs.filter((msg) => msg.ts !== data.ts)
                   );
