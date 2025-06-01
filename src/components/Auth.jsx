@@ -247,21 +247,6 @@ const Auth = ({ children }) => {
             <p className="text-[#8c6239] mb-6 text-center">
               Please authenticate with Slack to manage your messages
             </p>
-            <div className="flex justify-center">
-              <button
-                onClick={handleLogin}
-                className="flex items-center space-x-2 px-4 py-2 bg-[#4A154B] text-white rounded-lg hover:bg-[#3c0e3d] transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5 fill-current"
-                >
-                  <path d="M6 15a2 2 0 1 1-2-2c0 1.103.897 2 2 2zm0-2zm.459-3h3.082c.402 0 .77-.238.928-.616L11.728 6h2.544l1.259 3.384c.158.378.526.616.928.616h3.082l-1.29 3.324c-.147.379-.515.616-.928.616H16.46l-.728 2H9.268l-.728-2H6.677c-.413 0-.781-.237-.928-.616L4.459 10zm5.551-2l-.8-2H8.79l-.8 2h3.02z" />
-                </svg>
-                <span>Continue with Slack</span>
-              </button>
-            </div>
           </div>
         )}
       </div>
