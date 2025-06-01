@@ -2,20 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_API_URL;
-axios.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.code === "ERR_NETWORK") {
-      return Promise.reject({
-        message: "Network error - please check your connection",
-        original: error,
-      });
-    }
-    return Promise.reject(error);
-  }
-);
 
 const Auth = ({ children }) => {
   const [authState, setAuthState] = useState({
@@ -25,28 +12,46 @@ const Auth = ({ children }) => {
     error: null,
     authChecked: false,
   });
+  const [userId, setUserId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const verifyInterval = setInterval(() => {
-      if (authState.isAuthenticated) {
-        checkAuthStatus();
-      }
-    }, 5 * 60 * 1000);
+    const params = new URLSearchParams(window.location.search);
+    const urlUserId = params.get("user_id");
 
-    return () => clearInterval(verifyInterval);
-  }, [authState.isAuthenticated]);
+    if (urlUserId) {
+      localStorage.setItem("slack_user_id", urlUserId);
+      setUserId(urlUserId);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else {
+      const storedUserId = localStorage.getItem("slack_user_id");
+      if (storedUserId) setUserId(storedUserId);
+    }
+  }, []);
 
   const checkAuthStatus = async () => {
+    if (!userId) {
+      console.log("No userId available for auth check");
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        isAuthenticated: false,
+        error: "No user ID available",
+      }));
+      return false;
+    }
+
     try {
+      console.log(`Checking auth status for user: ${userId}`);
       const response = await axios.get("/auth/status", {
+        params: { userId },
         timeout: 5000,
-        validateStatus: (status) => status < 500, // Don't reject for 4xx errors
       });
 
-      console.log("Auth response:", response.data);
+      console.log("Auth status response:", response.data);
 
       if (response.data?.authenticated) {
+        console.log("User authenticated successfully");
         setAuthState({
           isAuthenticated: true,
           userInfo: response.data.user,
@@ -57,25 +62,25 @@ const Auth = ({ children }) => {
         return true;
       }
 
+      console.log("User not authenticated, response:", response.data);
       setAuthState((prev) => ({
         ...prev,
         isAuthenticated: false,
         loading: false,
+        error: response.data?.error || "Not authenticated",
         authChecked: true,
       }));
       return false;
     } catch (error) {
       console.error("Auth check failed:", {
         message: error.message,
-        config: error.config,
         response: error.response?.data,
       });
-
       setAuthState((prev) => ({
         ...prev,
         isAuthenticated: false,
         loading: false,
-        error: "Session verification failed",
+        error: error.response?.data?.error || "Session verification failed",
         authChecked: true,
       }));
       return false;
@@ -85,28 +90,16 @@ const Auth = ({ children }) => {
   useEffect(() => {
     const handleAuthFlow = async () => {
       const params = new URLSearchParams(window.location.search);
-      const isAuthSuccess = params.has("auth_success");
-      const isAuthError = params.has("auth_error");
 
       try {
-        if (isAuthSuccess) {
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
-
+        if (params.has("auth_success")) {
+          window.history.replaceState({}, "", window.location.pathname);
           const isAuthed = await checkAuthStatus();
           if (!isAuthed) {
             navigate("/?auth_error=1&reason=auth_verification_failed");
-            return;
           }
-        } else if (isAuthError) {
-          window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-          );
+        } else if (params.has("auth_error")) {
+          window.history.replaceState({}, "", window.location.pathname);
           setAuthState((prev) => ({
             ...prev,
             loading: false,
@@ -129,21 +122,26 @@ const Auth = ({ children }) => {
       }
     };
 
-    handleAuthFlow();
-  }, [navigate]);
+    if (userId) {
+      handleAuthFlow();
+    } else {
+      setAuthState((prev) => ({ ...prev, loading: false, authChecked: true }));
+    }
+  }, [navigate, userId]);
 
   const handleLogin = () => {
     setAuthState((prev) => ({ ...prev, error: null }));
-    window.location.href = `${
-      import.meta.env.VITE_API_URL
-    }/auth/slack?ts=${Date.now()}&force=true`;
+    window.location.href = `${import.meta.env.VITE_API_URL}/auth/slack`;
   };
 
   const handleLogout = async () => {
     try {
-      await axios.get(`${import.meta.env.VITE_API_URL}/auth/logout`, {
-        withCredentials: true,
-      });
+      if (userId) {
+        await axios.delete(`/logout/${userId}`);
+      }
+
+      localStorage.removeItem("slack_user_id");
+      setUserId(null);
       setAuthState({
         isAuthenticated: false,
         userInfo: null,
